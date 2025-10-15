@@ -1,17 +1,22 @@
 # ComfyUI/custom_nodes/ComfyUI-MidnightLook/__init__.py
 
-# Import class จากไฟล์ StringToBBOX.py
+# Import classes from their respective files
 from .StringToBBOX import MidnightLook_StringToBBOX
+from .InpaintUtils import MidnightLook_CropForInpaint, MidnightLook_PasteAfterInpaint
 
-# สร้าง Dictionary เพื่อ map ชื่อคลาสกับตัวคลาส
+# A dictionary that maps class names to class objects
 NODE_CLASS_MAPPINGS = {
-    "MidnightLook_StringToBBOX": MidnightLook_StringToBBOX
+    "MidnightLook_StringToBBOX": MidnightLook_StringToBBOX,
+    "MidnightLook_CropForInpaint": MidnightLook_CropForInpaint,
+    "MidnightLook_PasteAfterInpaint": MidnightLook_PasteAfterInpaint,
 }
 
-# สร้าง Dictionary เพื่อ map ชื่อคลาสกับชื่อที่จะแสดงผลใน UI
+# A dictionary that maps class names to UI display names
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "MidnightLook_StringToBBOX": "Crop data to BBOX"
+    "MidnightLook_StringToBBOX": "Crop data to BBOX",
+    "MidnightLook_CropForInpaint": "Crop For Inpaint",
+    "MidnightLook_PasteAfterInpaint": "Paste After Inpaint",
 }
 
-# พิมพ์ข้อความยืนยันเมื่อโหลดสำเร็จ (optional แต่แนะนำ)
-print("✅ MidnightLook: Loaded custom nodes.")
+# Print a confirmation message when nodes are loaded
+print("✅ MidnightLook: Custom nodes loaded successfully.")
