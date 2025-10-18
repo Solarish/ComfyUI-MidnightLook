@@ -9,7 +9,7 @@ class MidnightLook_StringToBBOX:
     and a bounding box, and return the bounding box as a BBOX tensor.
     
     Input format example: "((322, 322), (330, 174, 652, 496))"
-    Output BBOX: [330, 174, 652, 496]
+    Output BBOX: [330, 174, 652, 496]sdf
     """
     
     @classmethod
