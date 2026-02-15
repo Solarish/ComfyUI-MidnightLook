@@ -1,12 +1,14 @@
 import torch
 import numpy as np
 
+
 class MidnightLook_CropForInpaint:
     """
     Crops a square region from the image based on the mask's bounding box,
     resizes it to a 1:1 aspect ratio, and outputs crop data.
-    This version crops to the smaller dimension to avoid black bars (zoom crop).
+    Uses the shorter dimension to avoid black bars (zoom crop).
     """
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -18,18 +20,18 @@ class MidnightLook_CropForInpaint:
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "MASK", "CROP_DATA",)
-    RETURN_NAMES = ("CROPPED_IMAGE", "CROPPED_MASK", "CROP_DATA",)
+    RETURN_TYPES = ("IMAGE", "MASK", "CROP_DATA")
+    RETURN_NAMES = ("CROPPED_IMAGE", "CROPPED_MASK", "CROP_DATA")
     FUNCTION = "crop_and_resize"
     CATEGORY = "MidnightLook/Inpaint"
 
     def crop_and_resize(self, image, mask, target_size, padding):
-        # --- 1. Tensor to NumPy ---
+        # 1. Tensor → NumPy
         image_np = image[0].cpu().numpy()
         mask_np = mask[0].cpu().numpy()
         original_height, original_width, _ = image_np.shape
 
-        # --- 2. Find Bounding Box from Mask ---
+        # 2. Find bounding box from mask
         if np.max(mask_np) == 0:
             bbox = (0, 0, original_width, original_height)
         else:
@@ -38,17 +40,17 @@ class MidnightLook_CropForInpaint:
             x_max, y_max = np.max(x_coords), np.max(y_coords)
             bbox = (x_min, y_min, x_max, y_max)
 
-        # --- 3. Add Padding to BBox ---
+        # 3. Add padding
         x1, y1, x2, y2 = bbox
         x1_padded = max(0, x1 - padding)
         y1_padded = max(0, y1 - padding)
         x2_padded = min(original_width, x2 + padding)
         y2_padded = min(original_height, y2 + padding)
-        
+
         crop_width = x2_padded - x1_padded
         crop_height = y2_padded - y1_padded
 
-        # --- 4. New Logic: Crop a square from the center of the padded area ---
+        # 4. Square crop from the center of the padded region
         side_length = min(crop_width, crop_height)
         center_x = x1_padded + crop_width / 2.0
         center_y = y1_padded + crop_height / 2.0
@@ -58,37 +60,40 @@ class MidnightLook_CropForInpaint:
         square_x2 = square_x1 + side_length
         square_y2 = square_y1 + side_length
 
-        # --- 5. Crop directly from the original image (no canvas needed) ---
+        # 5. Crop from the original image
         cropped_image_np = image_np[square_y1:square_y2, square_x1:square_x2, :]
         cropped_mask_np = mask_np[square_y1:square_y2, square_x1:square_x2]
 
-        # --- 6. Convert to Tensor for Resizing ---
+        # 6. Convert to tensor for resizing
         image_for_resize = torch.from_numpy(cropped_image_np).unsqueeze(0)
         mask_for_resize = torch.from_numpy(cropped_mask_np).unsqueeze(0)
 
-        # --- 7. Resize ---
+        # 7. Resize
         img_chw = image_for_resize.permute(0, 3, 1, 2)
         resized_image = torch.nn.functional.interpolate(
-            img_chw, size=(target_size, target_size), mode='bicubic', align_corners=False
+            img_chw, size=(target_size, target_size), mode="bicubic", align_corners=False
         ).permute(0, 2, 3, 1)
 
         mask_chw = mask_for_resize.unsqueeze(1)
         resized_mask = torch.nn.functional.interpolate(
-            mask_chw, size=(target_size, target_size), mode='nearest'
+            mask_chw, size=(target_size, target_size), mode="nearest"
         ).squeeze(1)
-        
-        # --- 8. Create CROP_DATA with the new square coordinates ---
-        crop_data = (square_x1, square_y1, square_x2, square_y2, original_width, original_height)
-        
-        print(f"✅ MidnightLook (Crop): Zoom-cropped to square [{square_x1}, {square_y1}, {square_x2}, {square_y2}] and resized.")
 
+        # 8. Build CROP_DATA
+        crop_data = (square_x1, square_y1, square_x2, square_y2, original_width, original_height)
+        print(
+            f"✅ MidnightLook (Crop): Zoom-cropped to square "
+            f"[{square_x1}, {square_y1}, {square_x2}, {square_y2}] and resized."
+        )
         return (resized_image, resized_mask, (crop_data,))
+
 
 class MidnightLook_PasteAfterInpaint:
     """
-    Pastes a resized (1:1 aspect ratio) inpainted image back to its original location,
-    handling the square crop data correctly.
+    Pastes a resized (1:1) inpainted image back to its original location
+    using the square crop data.
     """
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -98,44 +103,62 @@ class MidnightLook_PasteAfterInpaint:
                 "crop_data": ("CROP_DATA",),
             }
         }
+
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "paste_back"
     CATEGORY = "MidnightLook/Inpaint"
 
     def paste_back(self, original_image, inpainted_image, crop_data):
-        # --- 1. Unpack CROP_DATA ---
+        # 1. Unpack CROP_DATA
         data = crop_data[0]
         x1, y1, x2, y2, original_width, original_height = data
-        
+
         pasted_image_tensor = original_image.clone()
-        
-        # --- 2. Resize inpainted image back to original square crop size ---
+
+        # 2. Resize inpainted image back to original square crop size
         side_length = x2 - x1
-        
+
         inpainted_chw = inpainted_image.permute(0, 3, 1, 2)
         resized_inpainted = torch.nn.functional.interpolate(
-            inpainted_chw, size=(side_length, side_length), mode='bicubic', align_corners=False
+            inpainted_chw, size=(side_length, side_length), mode="bicubic", align_corners=False
         )
-        
-        # --- 3. Determine the slice of the inpainted image to paste ---
+
+        # 3. Determine the source slice
         src_x_start = max(0, -x1)
         src_y_start = max(0, -y1)
         src_x_end = side_length - max(0, x2 - original_width)
         src_y_end = side_length - max(0, y2 - original_height)
 
-        # --- 4. Determine the destination on the original image ---
+        # 4. Determine the destination on the original image
         dest_x_start = max(0, x1)
         dest_y_start = max(0, y1)
         dest_x_end = min(original_width, x2)
         dest_y_end = min(original_height, y2)
 
-        # --- 5. Slice and Paste ---
+        # 5. Slice and paste
         if src_x_end > src_x_start and src_y_end > src_y_start:
             inpainted_slice = resized_inpainted[:, :, src_y_start:src_y_end, src_x_start:src_x_end]
             inpainted_slice_hwc = inpainted_slice.permute(0, 2, 3, 1)
-            pasted_image_tensor[0, dest_y_start:dest_y_end, dest_x_start:dest_x_end, :] = inpainted_slice_hwc[0]
-        
-        print(f"✅ MidnightLook (Paste): Pasted inpainted image back to square region [{x1}, {y1}, {x2}, {y2}]")
+            pasted_image_tensor[0, dest_y_start:dest_y_end, dest_x_start:dest_x_end, :] = (
+                inpainted_slice_hwc[0]
+            )
 
+        print(
+            f"✅ MidnightLook (Paste): Pasted inpainted image back to "
+            f"square region [{x1}, {y1}, {x2}, {y2}]"
+        )
         return (pasted_image_tensor,)
 
+
+# ---------------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------------
+NODE_CLASS_MAPPINGS = {
+    "MidnightLook_CropForInpaint": MidnightLook_CropForInpaint,
+    "MidnightLook_PasteAfterInpaint": MidnightLook_PasteAfterInpaint,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "MidnightLook_CropForInpaint": "Crop For Inpaint (ML)",
+    "MidnightLook_PasteAfterInpaint": "Paste After Inpaint (ML)",
+}
