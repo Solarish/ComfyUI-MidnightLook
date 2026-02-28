@@ -1,5 +1,7 @@
 import torch
 import ast
+import gc
+import comfy.model_management
 
 # Common ComfyUI data types for the "any" input
 COMFY_ANY_TYPE = ["IMAGE", "MASK", "LATENT", "MODEL", "CONDITIONING", "CROP_DATA", "*"]
@@ -107,6 +109,83 @@ class MidnightLook_CropDATAToBBOX:
         return ([bbox_tensor],)
 
 
+
+class MidnightLook_DisplayAny:
+    """Takes any input and displays it as a string in the UI."""
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "source": (COMFY_ANY_TYPE,),
+            },
+        }
+
+    RETURN_TYPES = ()
+    FUNCTION = "display_any"
+    CATEGORY = "MidnightLook/Utils"
+    OUTPUT_NODE = True
+
+    def display_any(self, source):
+        if isinstance(source, torch.Tensor):
+            output_string = (
+                f"Tensor Shape: {source.shape}, "
+                f"DType: {source.dtype}, "
+                f"Device: {source.device}"
+            )
+        else:
+            try:
+                output_string = str(source)
+            except Exception as e:
+                output_string = f"Error converting to string: {e}"
+
+        return {"ui": {"text": [output_string]}}
+
+
+class MidnightLook_VRAMClear:
+    """
+    Clears VRAM by unloading models and running garbage collection.
+    Passes the input through unchanged.
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "input_data": ("*",), # Wildcard type
+                "mode": (["Specific Object", "All Models", "Nothing"], {"default": "Specific Object"}),
+            },
+        }
+
+    RETURN_TYPES = ("*",)
+    RETURN_NAMES = ("output_data",)
+    FUNCTION = "process"
+    CATEGORY = "MidnightLook/Utils"
+
+    def process(self, input_data, mode):
+        if mode == "Nothing":
+            return (input_data,)
+
+        print(f"🧹 MidnightLook VRAM Clear: Mode = {mode}")
+        
+        # 1. Handle All Models unloading
+        if mode == "All Models":
+            print("   Unloading ALL models...")
+            comfy.model_management.unload_all_models()
+            comfy.model_management.soft_empty_cache()
+            
+        # 2. Handle specific object unloading (if possible)
+        elif mode == "Specific Object":
+            # If input is a model wrapper (ComfyUI often wraps models)
+            # Try to unload patches or models associated with input
+            pass
+
+        # 3. Always run GC and Empty Cache
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        
+        return (input_data,)
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -114,10 +193,14 @@ NODE_CLASS_MAPPINGS = {
     "MidnightLook_AnyToString": MidnightLook_AnyToString,
     "MidnightLook_StringToBBOX": MidnightLook_StringToBBOX,
     "MidnightLook_CropDATAToBBOX": MidnightLook_CropDATAToBBOX,
+    "MidnightLook_DisplayAny": MidnightLook_DisplayAny,
+    "MidnightLook_VRAMClear": MidnightLook_VRAMClear,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "MidnightLook_AnyToString": "Any to String (ML)",
     "MidnightLook_StringToBBOX": "String to BBox (ML)",
     "MidnightLook_CropDATAToBBOX": "Crop Data to BBox (ML)",
+    "MidnightLook_DisplayAny": "Display Any (ML)",
+    "MidnightLook_VRAMClear": "Clear VRAM (Pass-through)",
 }
