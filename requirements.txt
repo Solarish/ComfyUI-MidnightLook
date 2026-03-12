@@ -1,4 +1,5 @@
 requests
+safetensors
 tqdm
 Pillow
 numpy

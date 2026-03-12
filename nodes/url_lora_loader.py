@@ -4,7 +4,13 @@ import requests
 import folder_paths
 import comfy.utils
 import comfy.sd
-from tqdm import tqdm
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
+
+print("MidnightLook: Attempting to load URLLoRALoader...")
 
 class MidnightLook_URLLoRALoader:
     """
@@ -59,7 +65,7 @@ class MidnightLook_URLLoRALoader:
 
         # 3. Check if cached
         if not os.path.exists(full_path):
-            print(f"📡 MidnightLook: Downloading LoRA from {url}...")
+            print(f"MidnightLook: Downloading LoRA from {url}...")
             try:
                 # Use a temp file for atomic download
                 temp_path = full_path + ".downloading"
@@ -70,35 +76,38 @@ class MidnightLook_URLLoRALoader:
                 total_size = int(response.headers.get('content-length', 0))
                 block_size = 1024 * 1024 # 1MB
                 
-                progress_bar = tqdm(total=total_size, unit='iB', unit_scale=True, desc="MidnightLook Download")
+                if tqdm:
+                    progress_bar = tqdm(total=total_size, unit='iB', unit_scale=True, desc="MidnightLook Download")
                 
                 with open(temp_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=block_size):
                         if chunk:
                             f.write(chunk)
-                            progress_bar.update(len(chunk))
+                            if tqdm:
+                                progress_bar.update(len(chunk))
                 
-                progress_bar.close()
+                if tqdm:
+                    progress_bar.close()
                 
                 # Atomic rename
                 os.rename(temp_path, full_path)
-                print(f"✅ MidnightLook: LoRA downloaded successfully to {full_path}")
+                print(f"MidnightLook: LoRA downloaded successfully to {full_path}")
                 
             except Exception as e:
-                print(f"❌ MidnightLook Error: Failed to download LoRA from {url}")
+                print(f"MidnightLook Error: Failed to download LoRA from {url}")
                 print(f"   Reason: {e}")
-                if os.path.exists(temp_path):
+                if 'temp_path' in locals() and os.path.exists(temp_path):
                     os.remove(temp_path)
                 return (model, clip)
 
         # 4. Load LoRA
-        print(f"📦 MidnightLook: Loading LoRA {filename}...")
+        print(f"MidnightLook: Loading LoRA {filename}...")
         try:
             lora = comfy.utils.load_torch_file(full_path, safe_load=True)
             model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, lora, strength_model, strength_clip)
             return (model_lora, clip_lora)
         except Exception as e:
-            print(f"❌ MidnightLook Error: Failed to load LoRA from {full_path}")
+            print(f"MidnightLook Error: Failed to load LoRA from {full_path}")
             print(f"   Reason: {e}")
             return (model, clip)
 
