@@ -41,6 +41,8 @@ app.registerExtension({
                 this.ml_img2 = document.createElement("img");
                 this.ml_slider = document.createElement("input");
                 this.ml_score = document.createElement("div");
+                this.ml_label_before = document.createElement("div");
+                this.ml_label_after = document.createElement("div");
 
                 // Setup Image 1 (Bottom / Before)
                 this.ml_img1.style.position = "absolute";
@@ -114,6 +116,39 @@ app.registerExtension({
                 this.ml_score.style.pointerEvents = "none";
                 this.ml_score.innerText = "Waiting for images...";
 
+                // Setup Before Label (Image 1 is the bottom image, shown on the Right side when slider is left)
+                // Actually, Image 2 (After) is the Top image, revealed on the Right side of the slider by default.
+                // Wait, polygon(0 0, val% 0, val% 100%, 0 100%) means Image 2 is mapped from exactly Left side up to val%.
+                // So Image 2 (After) is on the Left. Image 1 (Before) is on the Right.
+                this.ml_label_before.style.position = "absolute";
+                this.ml_label_before.style.bottom = "8px";
+                this.ml_label_before.style.right = "8px";
+                this.ml_label_before.style.background = "rgba(0,0,0,0.6)";
+                this.ml_label_before.style.color = "white";
+                this.ml_label_before.style.padding = "2px 6px";
+                this.ml_label_before.style.borderRadius = "4px";
+                this.ml_label_before.style.fontSize = "11px";
+                this.ml_label_before.style.fontFamily = "sans-serif";
+                this.ml_label_before.style.fontWeight = "bold";
+                this.ml_label_before.style.zIndex = "20";
+                this.ml_label_before.style.pointerEvents = "none";
+                this.ml_label_before.innerText = "Before";
+
+                // Setup After Label 
+                this.ml_label_after.style.position = "absolute";
+                this.ml_label_after.style.bottom = "8px";
+                this.ml_label_after.style.left = "8px";
+                this.ml_label_after.style.background = "rgba(0,0,0,0.6)";
+                this.ml_label_after.style.color = "white";
+                this.ml_label_after.style.padding = "2px 6px";
+                this.ml_label_after.style.borderRadius = "4px";
+                this.ml_label_after.style.fontSize = "11px";
+                this.ml_label_after.style.fontFamily = "sans-serif";
+                this.ml_label_after.style.fontWeight = "bold";
+                this.ml_label_after.style.zIndex = "20";
+                this.ml_label_after.style.pointerEvents = "none";
+                this.ml_label_after.innerText = "After";
+
                 // Interaction
                 this.ml_slider.addEventListener("input", (e) => {
                     const val = e.target.value;
@@ -132,6 +167,8 @@ app.registerExtension({
                 container.appendChild(this.ml_line);
                 container.appendChild(this.ml_handle);
                 container.appendChild(this.ml_score);
+                container.appendChild(this.ml_label_before);
+                container.appendChild(this.ml_label_after);
                 container.appendChild(this.ml_slider);
 
                 this.size = [400, 300];

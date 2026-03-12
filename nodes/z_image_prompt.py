@@ -7,6 +7,7 @@ class MidnightLook_ZImagePrompt:
     # --- PRESETS ---
     SUBJECT_PRESETS = [
         "None",
+        "",
         "A 20-year-old Asian woman",
         "A 25-year-old Caucasian woman", 
         "A 30-year-old Black woman",
@@ -18,6 +19,7 @@ class MidnightLook_ZImagePrompt:
     
     OUTFIT_PRESETS = [
         "None",
+        "",
         "Casual T-shirt and jeans",
         "Elegant evening dress",
         "Business suit",
@@ -30,6 +32,7 @@ class MidnightLook_ZImagePrompt:
     
     POSE_PRESETS = [
         "None",
+        "",
         "Standing gracefully",
         "Sitting relaxed",
         "Walking towards camera",
@@ -41,6 +44,7 @@ class MidnightLook_ZImagePrompt:
     
     BACKGROUND_PRESETS = [
         "None",
+        "",
         "City street at night",
         "Sunny beach",
         "Forest nature",
@@ -52,6 +56,7 @@ class MidnightLook_ZImagePrompt:
 
     LIGHTING_PRESETS = {
         "None": "",
+        "": "",
         "Natural (Golden Hour)": "golden hour sunlight, warm atmosphere",
         "Natural (Overcast)": "soft diffused light, overcast sky",
         "Studio (Rembrandt)": "Rembrandt lighting, dramatic shadows",
@@ -62,6 +67,7 @@ class MidnightLook_ZImagePrompt:
     
     STYLE_PRESETS = {
         "None": "",
+        "": "",
         "Film (Leica M6/Portra 400)": "Shot on Leica M6, Kodak Portra 400 film grain, 35mm lens, photorealistic, highly detailed",
         "Vintage (35mm/Raw)": "Captured with a vintage 35mm lens, visible film grain, slight lens softness, chromatic aberration, 16mm glow, raw photo",
         "Portrait (Analog/Gritty)": "Gritty analog film photograph, natural film grain, shallow depth of field, warm and muted color grading",
@@ -78,6 +84,7 @@ class MidnightLook_ZImagePrompt:
     
     TEXT_RENDERING_PRESETS = [
         "None",
+        "",
         "holding a sign saying 'Hello'",
         "wearing a t-shirt with text 'Love'",
         "neon sign reading 'Open'",
@@ -88,6 +95,8 @@ class MidnightLook_ZImagePrompt:
         return {
             "required": {
                 "trigger_word": ("STRING", {"multiline": False, "default": ""}), 
+                "randomize_presets": ("BOOLEAN", {"default": False}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 
                 # Combos offer list but allow custom text if widgets support it (ComfyUI combo usually restricts to list).
                 # To support custom text alongside presets in standard Comfy nodes, 
@@ -146,7 +155,7 @@ class MidnightLook_ZImagePrompt:
     FUNCTION = "process"
     CATEGORY = "MidnightLook/Z-Image"
 
-    def process(self, trigger_word, 
+    def process(self, trigger_word, randomize_presets, seed,
                 subject_preset, subject_custom,
                 outfit_preset, outfit_custom,
                 pose_preset, pose_custom,
@@ -156,6 +165,19 @@ class MidnightLook_ZImagePrompt:
                 text_rendering_preset, text_rendering_custom,
                 description_input=""):
         
+        import random
+        rng = random.Random(seed)
+
+        def get_preset_val(chosen, preset_collection):
+            if randomize_presets:
+                if isinstance(preset_collection, dict):
+                    options = [k for k in preset_collection.keys() if k not in ("None", "")]
+                    return rng.choice(options) if options else "None"
+                else:
+                    options = [x for x in preset_collection if x not in ("None", "")]
+                    return rng.choice(options) if options else "None"
+            return chosen
+
         parts = []
 
         # 1. Trigger Word
@@ -167,37 +189,44 @@ class MidnightLook_ZImagePrompt:
             parts.append(description_input.strip())
 
         # 2. Subject
-        subject = self._resolve(subject_preset, subject_custom)
+        subject_p = get_preset_val(subject_preset, self.SUBJECT_PRESETS)
+        subject = self._resolve(subject_p, subject_custom)
         if subject: parts.append(subject)
 
         # 3. Outfit
-        outfit = self._resolve(outfit_preset, outfit_custom)
+        outfit_p = get_preset_val(outfit_preset, self.OUTFIT_PRESETS)
+        outfit = self._resolve(outfit_p, outfit_custom)
         if outfit: parts.append(outfit)
 
         # 4. Pose
-        pose = self._resolve(pose_preset, pose_custom)
+        pose_p = get_preset_val(pose_preset, self.POSE_PRESETS)
+        pose = self._resolve(pose_p, pose_custom)
         if pose: parts.append(pose)
 
         # 5. Background
-        bg = self._resolve(background_preset, background_custom)
+        bg_p = get_preset_val(background_preset, self.BACKGROUND_PRESETS)
+        bg = self._resolve(bg_p, background_custom)
         if bg: parts.append(bg)
 
         # 6. Lighting (Map key to value)
-        light_val = self.LIGHTING_PRESETS.get(lighting_preset, "")
+        light_p = get_preset_val(lighting_preset, self.LIGHTING_PRESETS)
+        light_val = self.LIGHTING_PRESETS.get(light_p, "")
         if lighting_custom.strip():
-            light_val = f"{light_val}, {lighting_custom.strip()}" if light_val else lighting_custom.strip()
+            light_val = lighting_custom.strip()
         if light_val.strip():
             parts.append(light_val.strip(","))
 
         # 7. Style (Map key to value)
-        style_val = self.STYLE_PRESETS.get(style_preset, "")
+        style_p = get_preset_val(style_preset, self.STYLE_PRESETS)
+        style_val = self.STYLE_PRESETS.get(style_p, "")
         if style_custom.strip():
-            style_val = f"{style_val}, {style_custom.strip()}" if style_val else style_custom.strip()
+            style_val = style_custom.strip()
         if style_val.strip():
             parts.append(style_val.strip(","))
 
         # 8. Text Rendering
-        text_val = self._resolve(text_rendering_preset, text_rendering_custom)
+        text_p = get_preset_val(text_rendering_preset, self.TEXT_RENDERING_PRESETS)
+        text_val = self._resolve(text_p, text_rendering_custom)
         if text_val: parts.append(text_val)
 
         # Combine
@@ -206,16 +235,12 @@ class MidnightLook_ZImagePrompt:
         return (final_prompt,)
 
     def _resolve(self, preset, custom):
-        """Helper to combine preset and custom text."""
-        res = ""
-        if preset and preset != "None":
-            res += preset
+        """Helper to combine preset and custom text. Prioritize custom text if provided."""
         if custom and custom.strip():
-            if res:
-                res += f", {custom.strip()}"
-            else:
-                res = custom.strip()
-        return res
+            return custom.strip()
+        if preset and preset not in ("None", ""):
+            return preset
+        return ""
 
 NODE_CLASS_MAPPINGS = {
     "MidnightLook_ZImagePrompt": MidnightLook_ZImagePrompt,

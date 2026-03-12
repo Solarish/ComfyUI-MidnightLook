@@ -341,9 +341,8 @@ class MidnightDetailerNode:
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
                 "model": ("MODEL",),
+                "clip": ("CLIP",),
                 "vae": ("VAE",),
-                "positive": ("CONDITIONING",),
-                "negative": ("CONDITIONING",),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 10000}),
                 "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step":0.1, "round": 0.01}),
@@ -351,13 +350,13 @@ class MidnightDetailerNode:
                 "scheduler": (comfy.samplers.KSampler.SCHEDULERS, ),
                 "denoise": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "target_size": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 64}),
+                "mask_blur": ("INT", {"default": 4, "min": 0, "max": 64}),
+                "mask_expand": ("INT", {"default": 8, "min": -64, "max": 64}),
+                "preset_prompt": (["None", "highly detailed face, skin pores, 8k resolution, masterpiece", "highly detailed eyes, beautiful catchlights, sharp focus", "highly detailed clothing texture, fabric weaves"], {"default": "None"}),
+                "guide_prompt": ("STRING", {"multiline": True, "default": ""}),
             },
             "optional": {
                 "bbox": ("BBOX",),
-                "bbox_x": ("INT", {"default": -1}),
-                "bbox_y": ("INT", {"default": -1}),
-                "bbox_w": ("INT", {"default": -1}),
-                "bbox_h": ("INT", {"default": -1}),
             }
         }
 
@@ -366,18 +365,13 @@ class MidnightDetailerNode:
     FUNCTION = "process"
     CATEGORY = "MidnightLook/Detailer"
 
-    def process(self, image, mask, model, vae, positive, negative, seed, steps, cfg, sampler_name, scheduler, denoise, target_size, bbox=None, bbox_x=-1, bbox_y=-1, bbox_w=-1, bbox_h=-1):
+    def process(self, image, mask, model, clip, vae, seed, steps, cfg, sampler_name, scheduler, denoise, target_size, mask_blur, mask_expand, preset_prompt, guide_prompt, bbox=None):
         b, h, w, c = image.shape
         
         # 1. Provide Fallback for BBOX Parsing
         if bbox is not None:
             bbox_data = bbox[0]
             x1, y1, x2, y2 = bbox_data.tolist()
-        elif bbox_x >= 0 and bbox_y >= 0 and bbox_w > 0 and bbox_h > 0:
-            x1 = bbox_x
-            y1 = bbox_y
-            x2 = bbox_x + bbox_w
-            y2 = bbox_y + bbox_h
         else:
             print("⚠️ MidnightDetailer: No valid BBOX provided. Returning original image.")
             return (image,)
@@ -391,19 +385,29 @@ class MidnightDetailerNode:
             print("⚠️ MidnightDetailer: Invalid BBOX dimensions. Returning original image.")
             return (image,)
             
-        # 2. Mask Refinement (Dilation + Blur)
+        # 2. Mask Refinement (Dilation/Erosion + Blur)
         # Convert mask to numpy for scipy operations
         mask_np = mask[0].cpu().numpy()
-        # Dilate mask slightly to cover edges
-        dilated_mask = scipy.ndimage.grey_dilation(mask_np, size=(8, 8))
+        
+        # Dilate or Erode mask
+        if mask_expand > 0:
+            processed_mask = scipy.ndimage.grey_dilation(mask_np, size=(mask_expand, mask_expand))
+        elif mask_expand < 0:
+            processed_mask = scipy.ndimage.grey_erosion(mask_np, size=(-mask_expand, -mask_expand))
+        else:
+            processed_mask = mask_np
+            
         # Gaussian blur for alpha blending feathering
-        blurred_mask = scipy.ndimage.gaussian_filter(dilated_mask, sigma=4)
+        blurred_mask = scipy.ndimage.gaussian_filter(processed_mask, sigma=mask_blur)
         blurred_mask_tensor = torch.from_numpy(blurred_mask).float().unsqueeze(0) # [1, H, W]
         
         # 3. Crop Image & Mask
-        # Square crop logic (similar to inpaint crop but strictly following BBOX center)
+        # Add margin to crop box so expanded masks aren't cut off by the original tight bbox
+        margin = max(0, mask_expand) + (mask_blur * 2) + 16
+        
+        # Square crop logic
         center_x, center_y = x1 + crop_w / 2.0, y1 + crop_h / 2.0
-        side_len = max(crop_w, crop_h)
+        side_len = max(crop_w, crop_h) + int(margin * 2)
         sq_x1, sq_y1 = int(center_x - side_len / 2.0), int(center_y - side_len / 2.0)
         sq_x2, sq_y2 = sq_x1 + side_len, sq_y1 + side_len
         
@@ -438,9 +442,29 @@ class MidnightDetailerNode:
         latent_mask = torch.nn.functional.interpolate(resized_mask_chw, size=(target_size // 8, target_size // 8), mode='nearest').squeeze(1)
         latent["noise_mask"] = latent_mask
         
+        # 6.5 Evaluate Guide Prompts
+        # Create empty conditionings first
+        from nodes import CLIPTextEncode
+        
+        # Default empty conditionings
+        empty_cond = CLIPTextEncode().encode(clip, "")[0]
+        final_positive = empty_cond
+        final_negative = empty_cond
+        
+        custom_parts = []
+        if preset_prompt and preset_prompt != "None":
+            custom_parts.append(preset_prompt)
+        if guide_prompt and guide_prompt.strip():
+            custom_parts.append(guide_prompt.strip())
+            
+        if custom_parts:
+            combined_text = ", ".join(custom_parts)
+            print(f"DEBUG: Encoding Detailer Custom Prompt: '{combined_text}'")
+            final_positive = CLIPTextEncode().encode(clip, combined_text)[0]
+        
         # 7. KSampler Inpaint
         # common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise)
-        sampled_latent = nodes.common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent, denoise=denoise)[0]
+        sampled_latent = nodes.common_ksampler(model, seed, steps, cfg, sampler_name, scheduler, final_positive, final_negative, latent, denoise=denoise)[0]
         
         # 8. VAE Decode
         decoded_img_bhwc = vae.decode(sampled_latent["samples"]) # [1, H, W, 3]

@@ -40,6 +40,8 @@ from .z_image_prompt import (
     NODE_CLASS_MAPPINGS as _z_prompt_cls,
     NODE_DISPLAY_NAME_MAPPINGS as _z_prompt_name,
 )
+from .preset_prompt import MidnightLook_PresetPrompt
+from .text_box import MidnightLook_TextBox
 from .loop_control_nodes import (
     NODE_CLASS_MAPPINGS as _loop_cls,
     NODE_DISPLAY_NAME_MAPPINGS as _loop_name,
@@ -51,6 +53,10 @@ from .midnight_detailer import (
 from .iterative_upscale import (
     NODE_CLASS_MAPPINGS as _upscale_cls,
     NODE_DISPLAY_NAME_MAPPINGS as _upscale_name,
+)
+from .url_lora_loader import (
+    NODE_CLASS_MAPPINGS as _url_lora_cls,
+    NODE_DISPLAY_NAME_MAPPINGS as _url_lora_name,
 )
 
 NODE_CLASS_MAPPINGS = {
@@ -65,9 +71,12 @@ NODE_CLASS_MAPPINGS = {
     **_df_crop_cls,
     **_qwen_cls,
     **_z_prompt_cls,
+    "MidnightLook_PresetPrompt": MidnightLook_PresetPrompt,
+    "MidnightLook_TextBox": MidnightLook_TextBox,
     **_loop_cls,
     **_detailer_cls,
     **_upscale_cls,
+    **_url_lora_cls,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -82,7 +91,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     **_df_crop_name,
     **_qwen_name,
     **_z_prompt_name,
+    "MidnightLook_PresetPrompt": "Preset Prompt (ML)",
+    "MidnightLook_TextBox": "Text Box (ML)",
     **_loop_name,
     **_detailer_name,
     **_upscale_name,
+    **_url_lora_name,
 }

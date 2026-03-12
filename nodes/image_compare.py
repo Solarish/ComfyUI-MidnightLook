@@ -14,13 +14,13 @@ class MidnightLook_ImageCompare:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "image1": ("IMAGE",),
-                "image2": ("IMAGE",),
+                "before": ("IMAGE",),
+                "after": ("IMAGE",),
             }
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE")
-    RETURN_NAMES = ("image1", "image2")
+    RETURN_NAMES = ("before", "after")
     FUNCTION = "compare_images"
     CATEGORY = "MidnightLook/Image"
     OUTPUT_NODE = True
@@ -38,13 +38,13 @@ class MidnightLook_ImageCompare:
         percentage = (1.0 - mae.item()) * 100.0
         return percentage
 
-    def compare_images(self, image1, image2):
+    def compare_images(self, before, after):
         # Handle batch: we'll only do the visual compare on the first image in the batch
         # to prevent overloading the UI.
         
         # Ensure they are on CPU
-        img1 = image1.cpu()
-        img2 = image2.cpu()
+        img1 = before.cpu()
+        img2 = after.cpu()
 
         # Get first image of batch
         first_img1 = img1[0]
@@ -93,4 +93,4 @@ class MidnightLook_ImageCompare:
         
         print(f"✅ MidnightLook (ImageCompare) -> {score_text}")
 
-        return {"ui": ui_output, "result": (image1, image2)}
+        return {"ui": ui_output, "result": (before, after)}

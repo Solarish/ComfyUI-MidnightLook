@@ -1,0 +1,83 @@
+[
+    {
+        "id": "subject_and_role",
+        "label": "Subject & Role",
+        "description": "กำหนดตัวแบบ อายุ เชื้อชาติ และบทบาท (เน้นกลุ่มเป้าหมาย Tech/Creator)",
+        "default_value": "35-year-old Asian male tech CEO",
+        "options": [
+            "35-year-old Asian male tech CEO",
+            "28-year-old European female startup founder",
+            "40-year-old African American male creative director",
+            "32-year-old Hispanic female freelance designer"
+        ]
+    },
+    {
+        "id": "clothing_and_pose",
+        "label": "Clothing, Pose & Expression",
+        "description": "เครื่องแต่งกาย การโพสท่า และอารมณ์บนใบหน้า (อิงตาม 4 สไตล์หลัก)",
+        "default_value": "confident look, wearing a premium black turtleneck",
+        "options": [
+            "confident look, wearing a premium black turtleneck",
+            "friendly professional smile, wearing a tailored dark navy suit and white shirt",
+            "approachable posture, wearing a modern business casual blazer over a t-shirt",
+            "dynamic relaxed pose, wearing a stylish smart casual coat"
+        ]
+    },
+    {
+        "id": "environment_and_framing",
+        "label": "Environment & Framing",
+        "description": "ฉากหลังและระยะการถ่ายภาพ (Shot type & Background อิงตาม 4 สไตล์หลัก)",
+        "default_value": "Close-up headshot, deep dark grey studio backdrop",
+        "options": [
+            "Close-up headshot, deep dark grey studio backdrop",
+            "Head and shoulders shot, clean light grey seamless backdrop",
+            "Medium shot portrait, modern glass-walled office with a soft blurred background",
+            "Medium close-up, bustling city street at dusk with neon bokeh"
+        ]
+    },
+    {
+        "id": "lighting_setup",
+        "label": "Production Lighting",
+        "description": "การจัดแสงระดับสตูดิโอเพื่อสร้างมิติ (อิงตามมู้ดภาพของ 4 สไตล์หลัก)",
+        "default_value": "high-contrast Rembrandt lighting with deep shadows",
+        "options": [
+            "high-contrast Rembrandt lighting with deep shadows",
+            "softbox studio lighting, bright and even, minimal shadows",
+            "natural window daylight with soft fill",
+            "low-key cinematic lighting, dramatic chiaroscuro, subtle neon rim light"
+        ]
+    },
+    {
+        "id": "technical_optics",
+        "label": "Technical Optics",
+        "description": "ระยะเลนส์และสเปคกล้องเพื่อสร้างมิติแบบหน้าชัดหลังเบลอ (Depth of Field)",
+        "default_value": "shot on 85mm lens, f/1.4, extremely shallow depth of field, creamy bokeh, sharp focus on the eyes",
+        "options": [
+            "shot on 85mm lens, f/1.4, extremely shallow depth of field, creamy bokeh, sharp focus on the eyes",
+            "shot on 50mm portrait lens, f/1.8, natural perspective, professional photography",
+            "shot on 105mm telephoto lens, f/2.0, compressed background, cinematic depth"
+        ]
+    },
+    {
+        "id": "style_and_quality",
+        "label": "Style & Post-Processing",
+        "description": "คุณภาพความคมชัด สไตล์การแต่งภาพ และ Color Grading (เน้นความพรีเมียมแบบ Digital Noir)",
+        "default_value": "Digital Noir aesthetic, highly detailed natural skin texture, 8K resolution, professional color grading",
+        "options": [
+            "Digital Noir aesthetic, highly detailed natural skin texture, 8K resolution, professional color grading",
+            "LinkedIn professional standard, clean corporate aesthetic, photorealistic",
+            "Editorial photography style, cinematic color palette, high-end retouching"
+        ]
+    },
+    {
+        "id": "cleanup_constraints",
+        "label": "Constraints (Positive Phrased)",
+        "description": "ข้อจำกัดเพื่อความสมบูรณ์แบบ (เขียนแบบ Positive เชิงบังคับ)",
+        "default_value": "plain uncluttered background, perfectly rendered face, correct human anatomy, sharp eyes",
+        "options": [
+            "plain uncluttered background, perfectly rendered face, correct human anatomy, sharp eyes",
+            "no logos, no text, no watermark, completely natural hands and shoulders",
+            "safe for work, modest professional outfit, no distracting background elements"
+        ]
+    }
+]
