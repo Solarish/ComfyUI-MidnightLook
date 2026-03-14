@@ -6,18 +6,29 @@ import nodes
 import folder_paths
 import os
 
+def get_model_dir(folder_name):
+    base = os.path.join(folder_paths.models_dir, folder_name)
+    if os.path.exists(folder_paths.models_dir):
+        for d in os.listdir(folder_paths.models_dir):
+            if d.lower() == folder_name.lower() and os.path.isdir(os.path.join(folder_paths.models_dir, d)):
+                return os.path.join(folder_paths.models_dir, d)
+    return base
+
 # Register missing model folders for dropdown population
+sams_dir = get_model_dir("sams")
+sam_dir = get_model_dir("sam")
+
 if "sams" not in folder_paths.folder_names_and_paths:
-    folder_paths.folder_names_and_paths["sams"] = ([os.path.join(folder_paths.models_dir, "sams"), os.path.join(folder_paths.models_dir, "sam")], folder_paths.supported_pt_extensions)
+    folder_paths.folder_names_and_paths["sams"] = ([sams_dir, sam_dir], folder_paths.supported_pt_extensions)
 else:
     # Ensure "sam" is checked along with "sams"
     sams_paths = folder_paths.folder_names_and_paths["sams"][0]
-    sam_path = os.path.join(folder_paths.models_dir, "sam")
-    if sam_path not in sams_paths:
-        sams_paths.append(sam_path)
+    if sam_dir not in sams_paths:
+        sams_paths.append(sam_dir)
 
+dino_dir = get_model_dir("grounding-dino")
 if "grounding-dino" not in folder_paths.folder_names_and_paths:
-    folder_paths.folder_names_and_paths["grounding-dino"] = ([os.path.join(folder_paths.models_dir, "grounding-dino")], folder_paths.supported_pt_extensions)
+    folder_paths.folder_names_and_paths["grounding-dino"] = ([dino_dir], folder_paths.supported_pt_extensions)
 
 _dino_cache = {}
 _sam2_cache = {}
@@ -232,12 +243,14 @@ class SAM2LoaderNode:
         
         if sam_path is None:
              base_path = folder_paths.models_dir
-             test_path = os.path.join(base_path, "sam", "model.safetensors")
+             sam_dir_resolved = get_model_dir("sam")
+             sams_dir_resolved = get_model_dir("sams")
+             test_path = os.path.join(sam_dir_resolved, "model.safetensors")
              if os.path.exists(test_path):
                  sam_path = test_path
                  sam2_model_name = "model.safetensors"
              else:
-                 test_path = os.path.join(base_path, "sams", sam2_model_name)
+                 test_path = os.path.join(sams_dir_resolved, sam2_model_name)
                  if os.path.exists(test_path):
                      sam_path = test_path
 

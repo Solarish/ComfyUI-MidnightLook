@@ -42,8 +42,14 @@ class MidnightLook_URLLoRALoader:
         # We try to put it in a subfolder of the first lora path
         lora_paths = folder_paths.get_folder_paths("loras")
         if not lora_paths:
-            # Fallback to models/loras
-            download_dir = os.path.join(folder_paths.models_dir, "loras", "url_downloads")
+            # Fallback to models/loras (case-insensitive for Linux)
+            lora_base = os.path.join(folder_paths.models_dir, "loras")
+            if os.path.exists(folder_paths.models_dir):
+                for d in os.listdir(folder_paths.models_dir):
+                    if d.lower() == "loras" and os.path.isdir(os.path.join(folder_paths.models_dir, d)):
+                        lora_base = os.path.join(folder_paths.models_dir, d)
+                        break
+            download_dir = os.path.join(lora_base, "url_downloads")
         else:
             download_dir = os.path.join(lora_paths[0], "url_downloads")
 

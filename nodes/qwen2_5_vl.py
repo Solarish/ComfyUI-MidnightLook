@@ -11,6 +11,14 @@ from qwen_vl_utils import process_vision_info
 import uuid
 from pathlib import Path
 
+def get_vlm_dir():
+    base = os.path.join(folder_paths.models_dir, "VLM")
+    if os.path.exists(folder_paths.models_dir):
+        for d in os.listdir(folder_paths.models_dir):
+            if d.lower() == "vlm" and os.path.isdir(os.path.join(folder_paths.models_dir, d)):
+                return os.path.join(folder_paths.models_dir, d)
+    return base
+
 # Helper functions for temp files (same as original but cleaner if possible)
 def temp_image(image, seed):
     unique_id = uuid.uuid4().hex
@@ -67,8 +75,8 @@ def temp_video(video, seed):
 class MidnightQwen25Load:
     @classmethod
     def INPUT_TYPES(s):
-        # Scan VLM folder
-        vlm_dir = os.path.join(folder_paths.models_dir, "VLM")
+        # Scan VLM folder (Case-insensitive for Linux)
+        vlm_dir = get_vlm_dir()
         if not os.path.exists(vlm_dir):
             os.makedirs(vlm_dir, exist_ok=True)
             
@@ -94,7 +102,8 @@ class MidnightQwen25Load:
         if model == "No models found in models/VLM":
             raise ValueError("No Qwen2.5-VL models found in ComfyUI/models/VLM/. Please download one.")
             
-        model_path = os.path.join(folder_paths.models_dir, "VLM", model)
+        vlm_dir = get_vlm_dir()
+        model_path = os.path.join(vlm_dir, model)
         
         print(f"Loading Qwen2.5-VL model from: {model_path}")
         
