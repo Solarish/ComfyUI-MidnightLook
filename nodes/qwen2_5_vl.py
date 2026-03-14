@@ -12,25 +12,49 @@ import uuid
 from pathlib import Path
 
 def get_vlm_dir():
-    base = os.path.join(folder_paths.models_dir, "VLM")
-    if os.path.exists(folder_paths.models_dir):
-        for d in os.listdir(folder_paths.models_dir):
-            if d.lower() == "vlm" and os.path.isdir(os.path.join(folder_paths.models_dir, d)):
-                return os.path.join(folder_paths.models_dir, d)
-    return base
+    # Attempt to use ComfyUI standard paths if available
+    try:
+        paths = folder_paths.get_folder_paths("vlm")
+        for p in paths:
+            if os.path.exists(p) and os.listdir(p):
+                return p
+    except:
+        pass
 
-def find_model_folders(base_path, max_depth=3):
+    # Fallback to manual discovery in models directory
+    base_models_dir = folder_paths.models_dir
+    if not os.path.exists(base_models_dir):
+        return os.path.join(base_models_dir, "VLM")
+
+    # Look for any 'vlm' folder (case-insensitive) that isn't empty
+    best_guess = os.path.join(base_models_dir, "VLM")
+    for d in os.listdir(base_models_dir):
+        if d.lower() == "vlm":
+            full_path = os.path.join(base_models_dir, d)
+            if os.path.isdir(full_path):
+                # If we find one with content, use it immediately
+                if os.listdir(full_path):
+                    return full_path
+                best_guess = full_path # Keep as fallback if others aren't found
+    return best_guess
+
+def find_model_folders(base_path, max_depth=4):
     model_folders = []
     if not os.path.exists(base_path):
         return model_folders
         
-    for root, dirs, files in os.walk(base_path):
-        rel_root = os.path.relpath(root, base_path)
-        depth = 0 if rel_root == "." else len(rel_root.split(os.sep))
+    print(f"Scanning for Qwen2.5-VL models in: {base_path} (followlinks=True)")
+    
+    # followlinks=True is critical for RunPod/Docker symlinks
+    for root, dirs, files in os.walk(base_path, followlinks=True):
+        # Normalize separators for consistent depth calculation across OS
+        rel_root = os.path.relpath(root, base_path).replace("\\", "/")
+        depth = 0 if rel_root == "." else len(rel_root.split("/"))
         
         if "config.json" in files:
             if rel_root != ".":
                 model_folders.append(rel_root)
+                # Once found a config.json, don't necessarily stop, but usually models aren't nested
             
         if depth >= max_depth:
             dirs[:] = [] # Stop going deeper
@@ -102,7 +126,9 @@ class MidnightQwen25Load:
         # Get model folders recursively
         models = find_model_folders(vlm_dir)
         if not models:
-            models = ["No models found in models/VLM"]
+            error_msg = f"No models found in {vlm_dir}. Please check path and permissions."
+            print(f"!!! {error_msg}")
+            models = [error_msg]
             
         return {
             "required": {
