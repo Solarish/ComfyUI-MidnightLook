@@ -19,6 +19,25 @@ def get_vlm_dir():
                 return os.path.join(folder_paths.models_dir, d)
     return base
 
+def find_model_folders(base_path, max_depth=3):
+    model_folders = []
+    if not os.path.exists(base_path):
+        return model_folders
+        
+    for root, dirs, files in os.walk(base_path):
+        rel_root = os.path.relpath(root, base_path)
+        depth = 0 if rel_root == "." else len(rel_root.split(os.sep))
+        
+        if "config.json" in files:
+            if rel_root != ".":
+                model_folders.append(rel_root)
+            
+        if depth >= max_depth:
+            dirs[:] = [] # Stop going deeper
+            continue
+            
+    return sorted(model_folders)
+
 # Helper functions for temp files (same as original but cleaner if possible)
 def temp_image(image, seed):
     unique_id = uuid.uuid4().hex
@@ -75,13 +94,13 @@ def temp_video(video, seed):
 class MidnightQwen25Load:
     @classmethod
     def INPUT_TYPES(s):
-        # Scan VLM folder (Case-insensitive for Linux)
+        # Scan VLM folder recursively
         vlm_dir = get_vlm_dir()
         if not os.path.exists(vlm_dir):
             os.makedirs(vlm_dir, exist_ok=True)
             
-        # Get subdirectories in VLM
-        models = [d for d in os.listdir(vlm_dir) if os.path.isdir(os.path.join(vlm_dir, d))]
+        # Get model folders recursively
+        models = find_model_folders(vlm_dir)
         if not models:
             models = ["No models found in models/VLM"]
             
@@ -105,6 +124,19 @@ class MidnightQwen25Load:
         vlm_dir = get_vlm_dir()
         model_path = os.path.join(vlm_dir, model)
         
+        # Auto-drill down: If config.json is not in the path, look one level deeper
+        if not os.path.exists(os.path.join(model_path, "config.json")):
+            print(f"config.json not found in {model_path}. Searching subfolders...")
+            try:
+                for d in os.listdir(model_path):
+                    sub_path = os.path.join(model_path, d)
+                    if os.path.isdir(sub_path) and os.path.exists(os.path.join(sub_path, "config.json")):
+                        print(f"Found model files in: {sub_path}")
+                        model_path = sub_path
+                        break
+            except Exception as e:
+                print(f"Error during auto-drill down: {e}")
+
         print(f"Loading Qwen2.5-VL model from: {model_path}")
         
         # Determine dtype
