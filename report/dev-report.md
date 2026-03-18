@@ -1,64 +1,57 @@
-# Project Development Report: ComfyUI-MidnightLook
-**Date:** March 14, 2026
-**Status:** In Active Development / Production Ready
+# Development & Infrastructure Report (MidnightLook)
+**Current Status & Infrastructure Specification: 2026-03-18**
+
+This report summarizes the current development state of the `ComfyUI-MidnightLook` pipeline and its underlying infrastructure.
 
 ---
 
-## 1. Project Overview
-**ComfyUI-MidnightLook** เป็นชุด Custom Nodes ประสิทธิภาพสูงสำหรับ ComfyUI ที่เน้นการประมวลผล Image-to-Text (VLM), การจัดการ Prompt ที่ซับซ้อน, และการทำ Image Refinement (Detailer/Upscale) โดยมีการออกแบบโครงสร้างพื้นฐานให้รองรับการทำงานทั้งบน Local Environment และ Serverless Architecture (เช่น RunPod)
+## 1. Production Pipeline Hardening (V4)
+The pipeline from Payment to Training and Generation is now stabilized with the following fixes:
+
+- **Webhook Synchronization:** Resolved Stripe PaymentIntent vs. Checkout Session mismatch. Webhooks now listen for `payment_intent.succeeded`.
+- **LoRA URL Extraction:** Implemented robust extraction of `output.storage_key` from RunPod, converting it into a full `R2_CUSTOM_DOMAIN` LoRA URL.
+- **Credit Leak Prevention:** Implemented "Pre-dispatch DB Lock" to ensure job records are created before firing expensive API requests to RunPod.
+- **Timeout Protection:** Added `maxDuration = 60` for all serverless routes on Vercel to prevent 504 Gateway Timeouts.
 
 ---
 
-## 2. Core Infrastructure (Docker & Linux)
-โครงสร้างพื้นฐานถูกออกแบบมาให้ "พกพาได้" และ "ปรับขนาดได้" (Portable & Scalable)
-- **Base Environment:** Ubuntu 22.04 + CUDA 12.4 + Python 3.12 (optimized for RTX 40/Ada Lovelace)
-- **Persistent Storage:** ใช้ระบบ Volume Mounting เพื่อแยก Model และ Custom Nodes ออกจากไฟล์ระบบของ Container ช่วยให้การอัปเดต Image ทำได้รวดเร็วโดยไม่ต้องดาวน์โหลดโมเดลใหม่
-- **RunPod Compatibility:** รองรับการทำงานในลักษณะ Serverless พร้อมระบบจัดการ Network Volume และ Symlinks ที่แข็งแกร่ง
+## 2. Infrastructure Specification (Docker/Runner)
+Based on the current `.infrastructure/infrastructure.md` and `docker-compose.yml`:
+
+- **Environment:**
+  - **Base Image:** `nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04` (RTX 4070 / Ada Lovelace Compatible).
+  - **Python:** 3.12 (Primary).
+  - **CUDA:** 12.4.
+- **Resource Limits:**
+  - **Shared Memory:** 4GB.
+  - **Memory Limit:** 24GB.
+- **Critical GPU Drivers:** Requires NVIDIA Container Toolkit installed on the host.
+- **Persistent Volumes:**
+  - `/app/ComfyUI/models` -> External Model drive.
+  - `/app/ComfyUI/custom_nodes` -> Workspace sync.
 
 ---
 
-## 3. Custom Nodes Ecosystem
-โครงการประกอบด้วย Node กลุ่มหลักดังนี้:
+## 3. Custom Node Infrastructure Dependencies
+Each node group requires specific environmental setups:
 
-### A. Vision Language Models (Qwen2.5-VL)
-- **MidnightQwen25Load:** ระบบโหลดโมเดลอัจฉริยะที่รองรับการค้นหาแบบ Recursive และ Symlink Traversal (ล่าสุดได้แก้ปัญหา path case-sensitivity และ symlink discovery)
-- **MidnightQwen25Run:** รองรับการทำ Batch Inference ของรูปภาพและการประมวลผลวิดีโอ (VLM)
-
-### B. Prompt & Logic Engineering
-- **Z-Image Prompt:** ระบบจัดการ Template Prompt ที่มีความยืดหยุ่นสูง
-- **Preset Prompt:** ระบบ Preset ที่ช่วยให้เรียกใช้ Prompt ประจำได้รวดเร็วผ่าน `preset.json`
-- **Loop Control:** Nodes สำหรับจัดการ Iterative Logic ใน workflow
-- **Midnight TextBox:** ประมวลผลและส่งต่อข้อมูลข้อความ
-
-### C. Advanced Image Processing
-- **Midnight Detailer:** เครื่องมือ Refinement เฉพาะจุด
-- **Iterative Upscale:** ระบบขยายภาพแบบแบ่งเป็นรอบๆ เพื่อรักษาความคมชัด
-- **MediaPipe/DeepFace Crop:** ระบบตรวจจับใบหน้าและอุปกรณต่างๆ เพื่อการ Crop ภาพที่แม่นยำสำหรับการทำ LoRA Test หรือ Inpaint
+- **VLM (Qwen2.5-VL):** Requires `transformers`, `qwen_vl_utils`, and `flash-attention-2` (optional but recommended for speed).
+- **Face Analysis:** Requires `deepface`, `mediapipe`, and `insightface` (if used by specific backends).
+- **Segmentation:** Requires `segment-anything` and `sam2`.
+- **Cloud Storage:** Requires `boto3` and valid `R2_` environment variables.
 
 ---
 
-## 4. Key Technical Improvements (Recent)
-ในช่วงการพัฒนาที่ผ่านมา มีการแก้ไขเชิงเทคนิคที่สำคัญ:
-1.  **Robust Model Discovery:** 
-    - แก้ปัญหา "Value not in list" บน RunPod โดยเพิ่ม `followlinks=True` ในระบบ discovery
-    - จัดการ Path Separators (`/` vs `\`) ให้เป็นกลาง (Cross-platform)
-    - ระบบ Auto-Drill Down เพื่อค้นหาไฟล์ `config.json` ในระดับลึก
-2.  **Case-Sensitivity Fix:** ทำให้ระบบโหลดโมเดลรองรับทั้งโฟลเดอร์ชื่อ `vlm` และ `VLM` ในระบบ Linux
-3.  **UI/UX Enhancements:** ปรับปรุง Error Logging ใน ComfyUI Console ให้ชัดเจน ระบุตำแหน่ง Path ที่ผิดพลาดได้ทันที
+## 4. Maintenance Commands & Access
+- **Update Types:** `npx supabase gen types typescript --project-id xhlfuoggntepqjxqwawd > utils/supabase/types.ts`
+- **RunPod CLI:** `./bin/runpodctl` for GPU monitoring and serverless management.
+- **Cloudflare R2:** `npx wrangler r2 object list midnightlook-uploads` to verify uploads.
 
 ---
 
-## 5. Deployment & Automation
-- **Model Downloader:** สคริปต์ `download_models.py` สำหรับเตรียมโมเดลมาตรฐาน (Z-Image Base/Turbo, Qwen encoders)
-- **Automation Scripts:** สคริปต์สำหรับการล้าง Docker Cache และการตรวจสอบสิทธิ์ใน S3 เพื่อการทำ Production Scaling
+## 5. Next Steps
+- [ ] Finalize the "Build-Your-Own 4-Pack" generation logic in the frontend.
+- [ ] Verify SAM2 mask accuracy on wide-angle portrait shots.
+- [ ] Monitor RunPod Serverless cold start times for the VLM endpoint.
 
----
-
-## 6. Next Steps
-- พัฒนาระบบ **Auto-VRAM Management** สำหรับโมเดล VLM ขนาดใหญ่
-- เพิ่มการสนับสนุน **SAM 2.1** ในโหนดการ Crop อัตโนมัติ
-- ขยาย Preset Library สำหรับงาน Photography และ Digital Art เฉพาะทาง
-
----
-**Report by:** Antigravity (Advanced Coding Agent)
-*Reference files: nodes/*.py, .infrastructure/infrastructure.md, requirements.txt*
+**Report Generated:** 2026-03-18 09:53 (Local Time)

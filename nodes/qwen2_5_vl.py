@@ -12,22 +12,32 @@ import uuid
 from pathlib import Path
 
 def get_vlm_dir():
+    # Explicitly register vlm folder path just in case
+    if "vlm" not in folder_paths.folder_names_and_paths:
+        folder_paths.add_model_folder_path("vlm", os.path.join(folder_paths.models_dir, "vlm"))
+
     # Attempt to use ComfyUI standard paths if available
     try:
         paths = folder_paths.get_folder_paths("vlm")
-        for p in paths:
-            if os.path.exists(p) and os.listdir(p):
-                return p
+        if paths:
+            for p in paths:
+                if os.path.exists(p) and os.path.isdir(p) and os.listdir(p):
+                    return p
     except:
         pass
 
-    # Fallback to manual discovery in models directory
     base_models_dir = folder_paths.models_dir
     if not os.path.exists(base_models_dir):
-        return os.path.join(base_models_dir, "VLM")
+        return os.path.join(base_models_dir, "vlm")
 
-    # Look for any 'vlm' folder (case-insensitive) that isn't empty
-    best_guess = os.path.join(base_models_dir, "VLM")
+    # Force check for lowercase 'vlm' directly first to avoid broken 'VLM' symlink
+    direct_vlm_path = os.path.join(base_models_dir, "vlm")
+    if os.path.exists(direct_vlm_path) and os.path.isdir(direct_vlm_path):
+        if os.listdir(direct_vlm_path):
+            return direct_vlm_path
+
+    # Fallback search
+    best_guess = direct_vlm_path
     for d in os.listdir(base_models_dir):
         if d.lower() == "vlm":
             full_path = os.path.join(base_models_dir, d)
@@ -144,8 +154,8 @@ class MidnightQwen25Load:
     CATEGORY = "MidnightLook/Qwen"
 
     def load_model(self, model, device, precision):
-        if model == "No models found in models/VLM":
-            raise ValueError("No Qwen2.5-VL models found in ComfyUI/models/VLM/. Please download one.")
+        if model == "No models found in models/vlm":
+            raise ValueError("No Qwen2.5-VL models found in ComfyUI/models/vlm/. Please download one.")
             
         vlm_dir = get_vlm_dir()
         model_path = os.path.join(vlm_dir, model)
